@@ -1,0 +1,117 @@
+class e amplifier
+* class E for qcx+ from qrp-labs.com
+* If you have ngspice >= 32, change M1's mu= to m=
+
+*** Design Paramters
+.param Rloadval=50
+.param freq=7.1meg
+.param Vsupply=12
+.param Cout=0//17p  // Transistor's Cout
+.param numtrans=3  // Number of transistors in parallel
+*** End Design Paramters
+
+.PARAM Pi = '355/113'
+.param freqrad=freq*2*Pi
+.param C30val=56p
+.param L4val=1u
+.param C29val=100n
+.param C2728val=270p
+.param C2526val=680p
+.param L13val = 1.38u
+.param L2val=1.7u
+
+.csparam freq={freq}
+.csparam Rloadval={Rloadval}
+
+
+vsource 1 0 DC 0 pulse(0 5 {1/freq/1000} {1/freq/1000} {1/freq/1000} {1/freq/2} {1/freq})
+M1 2 1 vsense BS170 mu={numtrans}  //  Version 31 uses mu, 32 uses m! will need to fix
+.model BS170 VDMOS VTO=1.824 RG=270 RS=1.572 RD=1.436 RB=.768 KP=.1233 Cgdmax=20p Cgdmin=3p CGS=28p Cjo=35p Rds=1.2E8 IS=5p Bv=60 Ibv=10u Tt=161.6n  // just found on internet, don't know how good this is
+vmeas vsense 0 DC 0 // just used to measure switch current
+vdc 3 0 DC Vsupply
+L4 3 2 {L4val}
+C30 2 vsense2 {C30val}
+vmeas2 vsense2 0 DC 0
+vmeas3 2 vsense3 DC 0
+C29 vsense3 4 {C29val}
+*C29 2 vout {C29val} //delete me
+*R vout 0 50 //delete me
+C28 4 0 C2728val
+L1 4 5 {L13val}
+C25 5 0 {C2526val}
+L2 5 6 {L2val}
+C26 6 0 {C2526val}
+L3 6 vout {L13val}
+C27 vout 0 {C2728val}
+R vout 0 {Rloadval}
+
+
+
+.control
+
+let freq = const.freq
+let transtep = 1/freq/1000
+let transtop = 210/freq
+let transtart = 200/freq
+
+tran $&transtep $&transtop $&transtart
+listing param
+
+plot v(vout)
+plot i(vmeas)*100 v(2)
+
+let inpwr = -v(2)*i(vdc)
+
+meas tran inavg avg inpwr from=$&transtart to=$&transtop
+
+
+fourier $&freq v(vout)
+let suppressionDB = db(fourier11[1][2]/fourier11[1][1])
+print suppressionDB
+
+let outpower = fourier11[1][1]*fourier11[1][1]/const.Rloadval/2
+print outpower/inavg
+print outpower
+
+
+
+if 0
+    setplot const
+    let index = 0
+    let fouriercount=1
+
+    setplot new
+    set effplot=$curplot
+
+
+    let C1valstart = const.C1val*1
+    let C1valstop = const.C1val*3
+    let C1valstep = (C1valstop-C1valstart)/10
+    let C1valtemp = C1valstart
+    compose C1vals start=$&C1valstart stop=$&C1valstop step=$&C1valstep
+    let eff = C1vals
+
+
+    while C1valtemp le C1valstop
+      alter c1 C1valtemp
+      tran $&transtep $&transtop $&transtart
+      reset  // may be needed after running tran above. if we ever change a param instead of a value using alterparam, we'd need this too
+      let inpwr = -v(2)*i(vdc)
+      meas tran inavg avg inpwr from=$&transtart to=$&transtop
+      fourier $&freq v(vout)
+      let fouriercount = fouriercount+1
+      let outpower = fourier{$&fouriercount}1[1][1]*fourier{$&fouriercount}1[1][1]/const.Rloadval/2
+      let {$effplot}.eff[$&index]=outpower/inavg
+      destroy $curplot
+      setplot $effplot
+      let C1valtemp = C1valtemp+C1valstep
+      let index = index+1
+    end
+     
+    plot eff vs c1vals
+
+end
+
+.endc
+
+.end

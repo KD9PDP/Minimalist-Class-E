@@ -1,0 +1,129 @@
+class e amplifier
+* pi network impedance matching
+* If you have ngspice >= 32, change M1's mu= to m=
+
+*** Design Paramters
+* Q of the LC filter at fundamental freq, excluding Lextra (this is not QL)
+.param Q=5
+.param Rant=50
+.param Rloadval=50 //CHANGE THIS
+*.param Rv=1  //solve using computer Rv=1, Q=10, Rant=50 RL=10
+*.param Rv=1.147  //solve using computer Rv=1.147, Q=10, Rant=50 RL=15
+*.param Rv=1.278  //solve using computer Rv=1.278, Q=10, Rant=50 RL=20
+*.param Rv=1.400  //solve using computer Rv=1.400, Q=10, Rant=50 RL=25
+*.param Rv=3.55  //solve using computer Rv=3.55, Q=5, Rant=50 RL=10
+*.param Rv=4.07  //solve using computer Rv=4.07, Q=5, Rant=50 RL=15
+*.param Rv=4.56  //solve using computer Rv=4.56, Q=5, Rant=50 RL=20
+*.param Rv=5  //solve using computer Rv=5, Q=5, Rant=50 RL=25
+*.param Rv=5.41  //solve using computer Rv=5.41, Q=5, Rant=50 RL=30
+.param Rv=6.90  //solve using computer Rv=6.90, Q=5, Rant=50 RL=50
+.param freq=7.1meg
+.param Vsupply=12
+.param Cout=0//17p  // Transistor's Cout
+.param numtrans=3  // Number of transistors in parallel
+*** End Design Paramters
+
+
+.PARAM Pi = '355/113'
+.param freqrad=freq*2*Pi
+.param Q1 = sqrt(Rloadval/Rv-1)
+.param Q2 = sqrt(Rant/Rv-1)
+.param L1val=28.4*Rloadval/freqrad
+.param C1val=1/5.4466/freqrad/Rloadval
+.param Cfval=1/Q/freqrad/Rloadval
+.param Ltotval = (Q+1.1525)*Rloadval/freqrad
+
+.param C2val=Q1/Rloadval/freqrad
+.param C3val=Q2/Rant/freqrad
+.param L2val=Rv/freqrad*(Q1+Q2)
+
+.csparam freq={freq}
+.csparam Rant={Rant}
+
+
+vsource 1 0 DC 0 pulse(0 5 {1/freq/1000} {1/freq/1000} {1/freq/1000} {1/freq/2} {1/freq})
+M1 2 1 vsense BS170 mu={numtrans}  //  Version 31 uses mu, 32 uses m! will need to fix
+.model BS170 VDMOS VTO=1.824 RG=270 RS=1.572 RD=1.436 RB=.768 KP=.1233 Cgdmax=20p Cgdmin=3p CGS=28p Cjo=35p Rds=1.2E8 IS=5p Bv=60 Ibv=10u Tt=161.6n  // just found on internet, don't know how good this is
+vmeas vsense 0 DC 0 // just used to measure switch current
+vdc 3 0 DC Vsupply
+L1 3 2 {L1val}
+C1 2 vsense2 {C1val}
+vmeas2 vsense2 0 DC 0
+vmeas3 2 vsense3 DC 0
+Cf vsense3 4 {Cfval}
+Ltot 4 5 {Ltotval}
+C2 5 0 {C2val}
+L2 5 vout {L2val}
+C3 vout 0 {C3val}
+R vout 0 {Rant}
+
+
+
+.control
+
+let freq = const.freq
+let transtep = 1/freq/1000
+let transtop = 210/freq
+let transtart = 200/freq
+
+tran $&transtep $&transtop $&transtart
+listing param
+
+plot v(vout)
+plot i(vmeas)*100 v(2)
+
+let inpwr = -v(2)*i(vdc)
+
+meas tran inavg avg inpwr from=$&transtart to=$&transtop
+
+
+fourier $&freq v(vout)
+let suppressionDB = db(fourier11[1][2]/fourier11[1][1])
+print suppressionDB
+
+let outpower = fourier11[1][1]*fourier11[1][1]/const.Rant/2
+print outpower/inavg
+print outpower
+
+
+
+if 0
+    setplot const
+    let index = 0
+    let fouriercount=1
+
+    setplot new
+    set effplot=$curplot
+
+
+    let C1valstart = const.C1val*1
+    let C1valstop = const.C1val*3
+    let C1valstep = (C1valstop-C1valstart)/10
+    let C1valtemp = C1valstart
+    compose C1vals start=$&C1valstart stop=$&C1valstop step=$&C1valstep
+    let eff = C1vals
+
+
+    while C1valtemp le C1valstop
+      alter c1 C1valtemp
+      tran $&transtep $&transtop $&transtart
+      reset  // may be needed after running tran above. if we ever change a param instead of a value using alterparam, we'd need this too
+      let inpwr = -v(2)*i(vdc)
+      meas tran inavg avg inpwr from=$&transtart to=$&transtop
+      fourier $&freq v(vout)
+      let fouriercount = fouriercount+1
+      let outpower = fourier{$&fouriercount}1[1][1]*fourier{$&fouriercount}1[1][1]/const.Rant/2
+      let {$effplot}.eff[$&index]=outpower/inavg
+      destroy $curplot
+      setplot $effplot
+      let C1valtemp = C1valtemp+C1valstep
+      let index = index+1
+    end
+     
+    plot eff vs c1vals
+
+end
+
+.endc
+
+.end
