@@ -128,11 +128,11 @@ If $Z(2\omega)$ is entirely real (which is the case in the QCX design on \url{ht
 \begin{align*}
 L_1&=\frac{3 \pi R_L Z(2\omega) }{[2R_L+8Z(2\omega)]\omega}
 & C_1&=\frac{1}{L_1 (2\omega)^2}\\
-C_f &\gg \omega R_L \text{ and } C_f \gg C_1
+C_f &\gg \frac{1}{\omega R_L} \text{ and } C_f \gg C_1
 & \left\langle P_{out} \right\rangle & = \frac{128}{9\pi^2}\frac{V_{CC}^2}{R_L}
 \end{align*}
 
-There's actually a different set of design equations for when $C_1 \ll C_f \ll \omega R_{ant}$ that does some cool stuff. The current through the load becomes a cosine (since the load becomes capacitive at $\omega$, and you get increased efficiency $\eta \approx 90\%$ at the cost of lower power ($\approx \SI{1}{W}$ total output on average). It's not derived here, but it's possible to do derive changing some steps later on. It's possibly a much less stable circuit, so I won't spend time on it, but theoretically possible nonetheless.
+There's actually a different set of design equations for when $C_1 \ll C_f \ll 1/(\omega R_L)$ that does some cool stuff. The current through the load becomes a cosine (since the load becomes capacitive at $\omega$, and you get increased efficiency $\eta \approx 90\%$ at the cost of lower power ($\approx \SI{1}{W}$ total output on average). It's not derived here, but it's possible to do derive changing some steps later on. It's possibly a much less stable circuit, so I won't spend time on it, but theoretically possible nonetheless.
 
 Finally, the theory presents a completely different strategy for what's required of filters. See Table \ref{filtercomparetable}. It turns out that the filter in Figure \ref{ClassEqcx} is one of the few filter designs that actually meets the requirements! It has an entirely real impedance at $\omega$ and $2\omega$ and presents as a capacitive load for $n\omega$ for $n>2$!
 
@@ -702,7 +702,7 @@ There are a lot of Class E explanation documents on the internet, but I haven't 
 
 This was motivated by discussions at the $\mu$SDX project where different builds were using different Class E designs that were incompatible with each other (one required inductive loads, one required only real loads). Having a base transceiver design with completely different PA filter requirements could cause problems if people tried to ``mix-and-match" filters between the two.
 
-When considering this, I saw that there was no theoretical description of the qrp-labs QCX Class E amplifier that was used by several people. The qrp-labs.com's ``QCX" transceiver\footnote{\url{https://qrp-labs.com/qcxp}} has an unconventional Class E amplifier design. The designer, Hans Summers (G0UPL) described the design as sort of a trial and error process guided by some ideas. It turned out that it worked pretty well, but it sort of violated some ``traditional" class E amplifier design rules. I decided to model it in ngspice to figure out what's going on, and found that it is actually a beautiful and elegant design that is fundamentally different than the strategies of other class E amplifiers. Some may call it "ghetto," but there's an elegance to it how it performs.
+When considering this, I saw that there was no theoretical description of the qrp-labs QCX Class E amplifier that was used by several people. The qrp-labs.com's ``QCX" transceiver\footnote{\url{https://qrp-labs.com/qcxp}} has an unconventional Class E amplifier design. The designer, Hans Summers (G0UPL) described the design as sort of a trial and error process guided by some ideas. It turned out that it worked pretty well, but it sort of violated some ``traditional" class E amplifier design rules. I decided to model it in ngspice to figure out what's going on, and found that it is actually a beautiful and elegant design that is fundamentally different than the strategies of other class E amplifiers. Some may call it ``ghetto," but there's an elegance to it how it performs.
 
 \subsection{QRP-Labs Design}
 The QCX manual says to use the following approach to choose components in Figure \ref{ClassE}. Although not grounded in theory, but in experimental trial and error - and produces excellent results!
@@ -812,7 +812,7 @@ i_c &= C_1 \frac{d v_c}{dt}=4 \omega C_1 V_{CC}  \sin(2\omega t)\\
 \label{QCXicplot}
 \end{figure}
 
-\item Next we'll find the current through the load (antenna). QCX Class E amplifiers use a filter that presents an entirely real load to the amplifier, and the blocking capacitor $C_f$ in Figure \ref{ClassEqcx} is chosen such that $C_f < \frac{1}{R_{ant}\omega}$. To find the current through the load we represent $v_C$ as a Fourier series:
+\item Next we'll find the current through the load (antenna). QCX Class E amplifiers use a filter that presents an entirely real load to the amplifier, and the blocking capacitor $C_f$ in Figure \ref{ClassEqcx} is chosen such that $C_f < \frac{1}{R_L\omega}$ (i.e., it's a high pass filter with a corner frequency $\ll \omega$). To find the current through the load we represent $v_c$ as a Fourier series:
 \begin{align*}
 v_c &= V_{CC}-\frac{ 16}{3\pi}V_{CC}\sin(\omega t)-V_{CC}\cos(2\omega t) + \frac{ 16}{15\pi}V_{CC}\sin(3\omega t)+\cdots\\
 \end{align*}
@@ -911,7 +911,6 @@ C_1 = \frac{\Im\{Z(2\omega)\}L_1\omega+|Z(2\omega)|}{4L_1 |Z(2\omega)|w^2}\\
 L_1=\frac{3 \pi R_{ant} \Re\{Z(2\omega)\} |Z(2\omega)| }{[2R_{ant}|Z(2\omega)|+8\Re\{Z(2\omega)\}]\omega}
 \end{align*}
 
-\textbf{impedance of filter matters}. if second harmonic is completely real, above works. If capacitive at 2w (as in pi networks, negative 90 degrees), cos(2w) turns into -sin(2w), and it modifies your capacitance. (not derived here)
 
 Finally, there is a DC component to $I(t)$ when the switch is closed that needs to be accounted for. How this is handled is by making sure $C_f \gg C_1$ and $C_f \gg C_2$. This means that the current will charge up the capacitor $C_f$ while not affecting $v_c$ that much. When the switch is closed, the current will discharge out of $C_f$ to ground. A $C_f\approx \SI{100}{\nano\farad}$ seems to work well.
 
